@@ -1,0 +1,159 @@
+import tkinter as tk
+from tkinter import messagebox, simpledialog
+import time
+import threading
+
+# Initialize the main game window
+root = tk.Tk()
+root.title("Tic-Tac-Toe")
+
+# Game variables
+current_player = "X"
+buttons = []
+player_X_wins = 0
+player_O_wins = 0
+player_X_name = "Player X"
+player_O_name = "Player O"
+grid_size = 3
+timer_duration = 10  # 10 seconds for each turn
+timer_thread = None
+timer_active = False
+
+# Scoreboard labels (initially empty)
+player_X_score_label = tk.Label(root, text=f"{player_X_name}: 0", font=('normal', 20, 'bold'))
+player_O_score_label = tk.Label(root, text=f"{player_O_name}: 0", font=('normal', 20, 'bold'))
+
+# Timer label
+timer_label = tk.Label(root, text=f"Time left: {timer_duration}", font=('normal', 20, 'bold'))
+
+# Function to check if a player has won
+def check_winner():
+    global current_player
+    win_conditions = []
+
+    # Horizontal, vertical, and diagonal win conditions for dynamic grid size
+    for i in range(grid_size):
+        win_conditions.append([i * grid_size + j for j in range(grid_size)])  # Rows
+        win_conditions.append([j * grid_size + i for j in range(grid_size)])  # Columns
+    win_conditions.append([i * (grid_size + 1) for i in range(grid_size)])   # Main diagonal
+    win_conditions.append([(i + 1) * (grid_size - 1) for i in range(grid_size)])  # Anti diagonal
+
+    for condition in win_conditions:
+        if all(buttons[i]["text"] == current_player for i in condition):
+            for i in condition:
+                buttons[i].config(bg="lightgreen")  # Highlight winning combination
+            return True
+    return False
+
+# Function to check if the board is full (draw condition)
+def check_draw():
+    return all(button["text"] != "" for button in buttons)
+
+# Function to handle player moves
+def on_click(index):
+    global current_player, player_X_wins, player_O_wins, timer_active
+
+    if buttons[index]["text"] == "":
+        buttons[index]["text"] = current_player
+        buttons[index].config(state="disabled")  # Disable the button after it's clicked
+
+        if check_winner():
+            if current_player == "X":
+                player_X_wins += 1
+                player_X_score_label.config(text=f"{player_X_name}: {player_X_wins}")
+            else:
+                player_O_wins += 1
+                player_O_score_label.config(text=f"{player_O_name}: {player_O_wins}")
+
+            messagebox.showinfo("Tic-Tac-Toe", f"{current_player} wins!")
+            disable_buttons()
+        elif check_draw():
+            messagebox.showinfo("Tic-Tac-Toe", "It's a draw!")
+            reset_game()
+        else:
+            # Switch players
+            current_player = "O" if current_player == "X" else "X"
+            timer_active = False  # Stop current timer
+            start_timer()
+
+# Function to disable all buttons (after a win)
+def disable_buttons():
+    for button in buttons:
+        button.config(state="disabled")
+
+# Function to reset the game board but keep the score
+def reset_game():
+    global current_player
+    current_player = "X"
+    for button in buttons:
+        button.config(text="", state="normal", bg="SystemButtonFace")
+    start_timer()
+
+# Function to reset the game board and scores
+def reset_game_and_scores():
+    global player_X_wins, player_O_wins
+    player_X_wins = 0
+    player_O_wins = 0
+    player_X_score_label.config(text=f"{player_X_name}: 0")
+    player_O_score_label.config(text=f"{player_O_name}: 0")
+    reset_game()
+
+# Timer function
+def countdown(time_left):
+    global timer_active
+    while timer_active and time_left > 0:
+        timer_label.config(text=f"Time left: {time_left}")
+        time_left -= 1
+        time.sleep(1)
+    if time_left == 0 and timer_active:
+        messagebox.showinfo("Tic-Tac-Toe", f"{current_player} ran out of time!")
+        reset_game()
+
+def start_timer():
+    global timer_active, timer_thread
+    timer_active = True
+    timer_thread = threading.Thread(target=countdown, args=(timer_duration,))
+    timer_thread.start()
+
+# Function to initialize the game with player names and grid size
+def setup_game():
+    global player_X_name, player_O_name, grid_size
+    player_X_name = simpledialog.askstring("Player X", "Enter Player X's name:")
+    player_O_name = simpledialog.askstring("Player O", "Enter Player O's name:")
+    grid_size = simpledialog.askinteger("Grid Size", "Enter grid size (e.g., 3 for 3x3):", minvalue=3, maxvalue=5)
+
+    # Clear existing buttons from the grid
+    for widget in root.grid_slaves():
+        widget.grid_forget()  
+
+    # Create a dynamic grid of buttons for Tic-Tac-Toe
+    for i in range(grid_size**2):
+        button = tk.Button(root, text="", font=('normal', 40, 'bold'), height=2, width=5,
+                           command=lambda i=i: on_click(i))
+        button.grid(row=i // grid_size, column=i % grid_size)
+        buttons.append(button)
+
+    # Update scoreboard labels with player names
+    player_X_score_label.config(text=f"{player_X_name}: 0")
+    player_O_score_label.config(text=f"{player_O_name}: 0")
+    start_timer()
+
+# Start the game with player names and grid setup
+setup_game()
+
+# Position the scoreboard labels in the grid
+player_X_score_label.grid(row=grid_size, column=0, columnspan=1)
+player_O_score_label.grid(row=grid_size, column=2, columnspan=1)
+
+# Position the timer label in the grid
+timer_label.grid(row=grid_size + 1, column=0, columnspan=3)
+
+# Add reset and restart buttons
+restart_button = tk.Button(root, text="Restart Game", font=('normal', 20, 'bold'), command=reset_game)
+restart_button.grid(row=grid_size + 2, column=0, columnspan=3)
+
+reset_score_button = tk.Button(root, text="Reset Game & Scores", font=('normal', 20, 'bold'), command=reset_game_and_scores)
+reset_score_button.grid(row=grid_size + 3, column=0, columnspan=3)
+
+# Run the GUI event loop
+root.mainloop()
